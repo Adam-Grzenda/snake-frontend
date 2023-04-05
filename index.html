@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Snake Frontend</title>
+    <script src="snake-game.js"></script>
+</head>
+<body>
+
+<label for="playerName">Player Name</label>
+<input type="text" id="playerName"/>
+<button onclick="createPlayer(document.getElementById('playerName').value)">Create player</button>
+
+<br><br>
+
+<label for="gameId">Game Id</label>
+<input disabled type="text" id="gameId"/>
+<button disabled onclick="createGame(30)" id="createGame">Create game</button>
+<button disabled onclick="joinGame(document.getElementById('gameId').value, document.getElementById('playerId').value)" id="joinGame">
+    Join game
+</button>
+<br>
+<button onclick="startGame(document.getElementById('gameId').value)">Start game</button>
+
+<canvas id="board" width="1000" height="1000"></canvas>
+
+
+<br><br>
+<label for="playerId">Player Id</label>
+<input type="text" id="playerId"/>
+</body>
+</html>
