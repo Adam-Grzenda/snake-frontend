@@ -3,30 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <title>Snake Frontend</title>
-    <script src="snake-game.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<label for="playerName">Player Name</label>
-<input type="text" id="playerName"/>
-<button onclick="createPlayer(document.getElementById('playerName').value)">Create player</button>
+<div class="container-fluid">
+    <div class="row" style="height: 95vh">
+        <div class="col-sm-3 border" id="sidebar" >
+            <div class="p-4 border-bottom">
+                <label for="game-id-display" class="col-form-label">Game ID</label>
+                <button type="submit" class="form-control" id="game-id-display"
+                        onclick="onClickGameId()" data-toggle="tooltip" title="Click to copy to clipboard">
+                    some-game-id
+                </button>
+                <button type="submit" class="form-control" onclick="startGame()">
+                    Start game
+                </button>
+            </div>
+            <div class="p-4">
+                <table class="table table-bordered">
+                    <thead>
+                    <tr>
+                        <th colspan="3">Ranking</th>
+                    </tr>
+                    <tr>
+                        <th scope="col">Nick</th>
+                        <th scope="col">Color</th>
+                        <th scope="col">Score</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>Test</td>
+                        <td bgcolor="aqua"></td>
+                        <td>1</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-sm-9 d-flex justify-content-center align-items-center border ">
+            <div class="card text-center collapse show" id="game-form">
+                <div class="card-header">
+                    Join or create a new game
+                </div>
+                <div class="card-body">
+                    <div class="form-group row">
+                        <label for="nick" class="col-sm-3 col-form-label">Nick:</label>
+                        <div class="col-sm-6">
+                            <input type="text" class="form-control" id="nick">
+                        </div>
+                    </div>
 
-<br><br>
+                    <div class="form-group row border-top pt-2">
+                        <label for="game-id" class="col-sm-3 col-form-label">Game ID:</label>
+                        <div class="col-sm-6">
+                            <input type="text" class="form-control" id="game-id">
+                        </div>
+                        <div class="col-sm-3">
+                            <button type="submit" class="btn btn-success" disabled id="join-game-btn"
+                                    onclick="joinGameSession()">Join
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-center align-items-center border-top border-bottom p-2">
+                        OR
+                    </div>
+                    <div class="form-group row pt-3 d-flex justify-content-center align-items-center">
+                        <button type="submit" class="btn btn-primary" disabled id="create-game-btn"
+                                onclick="createGame()">
+                            Create a new game
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card text-center collapse canvas-container" id="game-board">
+                <canvas id="board"></canvas>
+            </div>
+            <div id="errorToast" class="toast fixed-bottom" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <strong class="mr-auto">Something went wrong</strong>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="toast">Close</button>
+                </div>
+                <div class="toast-body">
+                    Treść wiadomości.
+                </div>
+            </div>
+        </div>
+    </div>
 
-<label for="gameId">Game Id</label>
-<input disabled type="text" id="gameId"/>
-<button disabled onclick="createGame(30)" id="createGame">Create game</button>
-<button disabled onclick="joinGame(document.getElementById('gameId').value, document.getElementById('playerId').value)" id="joinGame">
-    Join game
-</button>
-<br>
-<button onclick="startGame(document.getElementById('gameId').value)">Start game</button>
+</div>
+<p>
+    <a
+            hidden
+            id="collapseFormButton"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#game-form"
+            aria-expanded="false"
+            aria-controls="game-form">
+        Button with data-target
+    </a>
+    <a
+            hidden
+            id="collapseGameButton"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#game-board"
+            aria-expanded="false"
+            aria-controls="game-board">
+        Button with data-target
+    </a>
+</p>
 
-<canvas id="board" width="1000" height="1000"></canvas>
 
 
-<br><br>
-<label for="playerId">Player Id</label>
-<input type="text" id="playerId"/>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"
+        integrity="sha384-eMNCOe7tC1doHpGoWe/6oMVemdAVTMs2xqW4mwXrXsW0L84Iytr2wi5v2QjrP/xp"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.min.js"
+        integrity="sha384-cn7l7gDp0eyniUwwAZgrzD06kc/tftFf19TOAs2zVinnD/C7E91j9yyk5//jjpt/"
+        crossorigin="anonymous"></script>
+
+
+<script src="game.js"></script>
 </body>
 </html>
