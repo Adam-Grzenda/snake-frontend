@@ -19,7 +19,7 @@
                         onclick="onClickGameId()" data-toggle="tooltip" title="Click to copy to clipboard">
                     some-game-id
                 </button>
-                <button type="submit" class="form-control" onclick="startGame()">
+                <button type="submit" class="form-control" onclick="changeGameState()">
                     Start game
                 </button>
             </div>
@@ -81,7 +81,7 @@
                 </div>
             </div>
             <div class="card text-center collapse canvas-container" id="game-board">
-                <canvas id="board"></canvas>
+                <canvas id="board" style="background-color: cornflowerblue;"></canvas>
             </div>
             <div id="errorToast" class="toast fixed-bottom" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="toast-header">

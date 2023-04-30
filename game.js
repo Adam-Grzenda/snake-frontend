@@ -5,7 +5,7 @@ const BACKGROUND_FILL_STYLE = "rgb(128,128,128)";
 const APPLE_FILL_STYLE = "rgb(255,0,0)";
 
 let snakes = new Map();
-let players = new Map();
+
 function Player(id, name, score, status) {
     this.id = id;
     this.name = name;
@@ -13,6 +13,16 @@ function Player(id, name, score, status) {
     this.status = status;
     return this;
 }
+
+function Snake(id, playerNick, r, g, b, length) {
+    this.id = id;
+    this.playerName = playerNick;
+    this.r = r;
+    this.g = g;
+    this.b = b;
+    this.length = length;
+}
+
 
 let nickInput = document.getElementById("nick");
 let gameIdInput = document.getElementById("game-id");
@@ -46,8 +56,8 @@ function setCanvasSize() {
     let container = document.getElementById("game-board");
     let canvas = document.getElementById("board");
     console.log(container.offsetWidth + " " + container.offsetHeight)
-    canvas.width = Math.min(container.offsetWidth, container.offsetHeight);
-    canvas.height = Math.min(container.offsetWidth, container.offsetHeight);
+    canvas.width = 800;
+    canvas.height = 800;
 }
 
 async function createGame() {
@@ -56,12 +66,12 @@ async function createGame() {
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({"boardSize": 10})
+        body: JSON.stringify({"boardSize": 20})
     })
         .then(response => response.json())
         .then(response => {
             game = response;
-            console.log("created game: " + game["gameId"]);
+            console.log(`Created game: ${game["gameId"]}`);
             gameIdInput.value = game["gameId"];
         })
     await joinGameSession();
@@ -80,7 +90,7 @@ async function joinGameSession() {
     }
 
     connectWebSocket(player["id"]);
-    console.log("created player: " + player["id"] + " joining game with id: " + game["gameId"]);
+    console.log(`Created player: ${player["id"]} joining game with id ${game["gameId"]}`);
 
     socket.onopen = (
         (event) => {
@@ -108,13 +118,267 @@ async function joinGame() {
     game = currentGame;
     collapseFormButton.click();
     document.getElementById("game-board").addEventListener('shown.bs.collapse', function () {
-        setCanvasSize()
         drawGame(currentGame);
     })
     collapseBoardButton.click();
 
 }
 
+
+function disconnectWebSocket() {
+    socket.close();
+    console.log("Disconnected player WEBSOCKET session");
+}
+
+function drawGame(game) {
+    snakes = new Map();
+    setCanvasSize();
+
+    function drawCheckeredBackground(can, nRow, nCol) {
+        var ctx = can.getContext("2d");
+        var w = can.width;
+        var h = can.height;
+
+        nRow = nRow || 8;    // default number of rows
+        nCol = nCol || 8;    // default number of columns
+
+        w /= nCol;            // width of a block
+        h /= nRow;            // height of a block
+
+        for (var i = 0; i < nRow; ++i) {
+            for (var j = 0, col = nCol / 2; j < col; ++j) {
+                ctx.rect(2 * j * w + (i % 2 ? 0 : w), i * h, w, h);
+            }
+        }
+
+        ctx.fill();
+    }
+
+    var canvas = document.getElementById("board");
+    drawCheckeredBackground(canvas, game.boardSize, game.boardSize);
+
+    for (let snake of game.snakes) {
+        snakes.set(snake.id, new Snake(snake.id, snake.player.name, snake.color.r, snake.color.g, snake.color.b, snake.parts.length))
+        let color = `rgb(${snake.color.r},${snake.color.g},${snake.color.b})`;
+        for (let part of snake.parts) {
+            drawPart(part.x, part.y, color);
+        }
+    }
+
+    for (let apple of game.apples) {
+        drawPart(apple.coordinates.x, apple.coordinates.y, APPLE_FILL_STYLE)
+    }
+}
+
+function keyToDirection(key) {
+    switch (key) {
+        case "ArrowUp":
+            return 0;
+        case "ArrowDown":
+            return 1;
+        case "ArrowLeft":
+            return 2;
+        case "ArrowRight":
+            return 3;
+        default:
+            return "NONE"
+    }
+}
+
+document.addEventListener(
+    "keydown",
+    (event) => {
+        if (socket == null) {
+            return;
+        }
+        let direction = keyToDirection(event.key);
+        if (direction !== "NONE") {
+            let value = new Uint8Array(1);
+            value[0] = direction;
+            socket.send(value);
+        }
+    }
+)
+
+function showError(message) {
+    let myToast = document.getElementById("errorToast");
+    myToast.querySelector('.toast-body').innerHTML = message;
+    let toast = new bootstrap.Toast(myToast, {})
+    toast.show()
+}
+
+function drawPart(x, y, color) {
+    let canvas = document.getElementById("board")
+    let width = canvas.width;
+    let fieldSize = width / game.boardSize;
+    let context = canvas.getContext("2d");
+    context.fillStyle = color;
+    context.fillRect(x * fieldSize, y * fieldSize, fieldSize, fieldSize);
+}
+
+function addPlayer(data) {
+    let nickLength = data.getUint8(1);
+    let nick = "";
+    for (let i = 0; i < nickLength; i++) {
+        nick += String.fromCharCode(data.getUint8(2 + i));
+    }
+
+    let snakeId = data.getUint8(2 + nickLength);
+    let r = data.getUint8(2 + nickLength + 1);
+    let g = data.getUint8(2 + nickLength + 2);
+    let b = data.getUint8(2 + nickLength + 3);
+
+    let x = data.getUint8(2 + nickLength + 4);
+    let y = data.getUint8(2 + nickLength + 5);
+
+    console.log(`New player joined: ${nick}, snakeId: ${snakeId}, color: (${r}, ${g}, ${b}), head: (${x}, ${y})`);
+    snakes.set(snakeId, new Snake(snakeId, nick, r, g, b, 1));
+    drawPart(x, y, `rgb(${r},${g},${b})`)
+}
+
+function applyBinaryDelta(data) {
+    function getPartColor(elementId) {
+        if (elementId === 255) {
+            return APPLE_FILL_STYLE;
+        }
+
+        let snake = snakes.get(elementId);
+        if (!snake) {
+            console.error(`Snake with id: ${elementId} Not found`);
+            return "rgb(0,0,0)";
+        }
+        return `rgb(${snake.r},${snake.g},${snake.b})`;
+    }
+
+    let deadSnakeIds = new Set();
+    let pointBalance = new Map();
+
+    function addPoint(elementId) {
+        pointBalance.set(elementId, pointBalance.has(elementId) ? pointBalance.get(elementId) + 1 : 1);
+    }
+
+    function removePoint(elementId) {
+        pointBalance.set(elementId, pointBalance.has(elementId) ? pointBalance.get(elementId) - 1 : -1);
+    }
+
+    for (let deltaN = 1; deltaN + 4 <= data.byteLength; deltaN += 4) {
+        let operationType = data.getUint8(deltaN);
+        let elementId = data.getUint8(deltaN + 1);
+        let x = data.getUint8(deltaN + 2);
+        let y = data.getUint8(deltaN + 3);
+
+        let color = getPartColor(elementId);
+        console.log(`Handling delta, type: ${operationType}, elementId: ${elementId}, x: ${x}, y: ${y}, color: ${color}`)
+
+        switch (operationType) {
+            case 1:
+                addPoint(elementId);
+                drawPart(x, y, color);
+                break;
+            case 2:
+                deadSnakeIds.add(elementId);
+            case 0:
+                removePoint(elementId);
+                if (elementId !== 255) {
+                    drawPart(x, y, BACKGROUND_FILL_STYLE);
+                }
+                break;
+        }
+    }
+
+    for (let balance of pointBalance.entries()) {
+        if (balance.value >= 2) {
+            let snake = snakes.get(balance.key);
+            if (!snake) {
+                console.error("Unknown snake with point balance");
+                continue;
+            }
+            snake.length += balance.value - 1;
+        }
+    }
+
+    if (deadSnakeIds.length !== 0) {
+        for (let snakeId of deadSnakeIds) {
+            let snake = snakes.get(snakeId);
+            if (snake.playerName === player.name) {
+                console.log("You lose");    //todo
+            } else {
+                console.log(`Player: ${snake.playerName} lost`);
+            }
+        }
+    }
+
+}
+
+function endGame() {
+    console.log("Game ended");
+    collapseBoardButton.click();
+    collapseFormButton.click();
+}
+
+function pauseGame(data) {
+    console.log(`Game paused by snake id: ${data.getUint8(1)}`)
+}
+
+function parseEvent(bytearray) {
+    let data = new DataView(bytearray);
+    let messageType = data.getUint8(0);
+
+    console.log(`Message received with type: ${messageType}`);
+
+    switch (messageType) {
+        case 0:
+            addPlayer(data);
+            break;
+        case 1:
+            applyBinaryDelta(data);
+            break;
+        case 2:
+            pauseGame(data);
+            break;
+        case 3:
+            endGame()
+            break;
+    }
+}
+
+function connectWebSocket(playerId) {
+    socket = new WebSocket(
+        `${BACKEND_WS}/${playerId}`
+    )
+    socket.binaryType = 'arraybuffer'
+
+    socket.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+            parseEvent(event.data);
+        } else {
+            console.log("Wrong data format")
+        }
+    }
+}
+
+
+function changeGameState() {
+    function startGame() {
+        fetch(`${BACKEND}/games/${game["gameId"]}`,
+            {
+                method: 'POST'
+            }
+        ).then(response => {
+            console.log(`Started game with ID: ${game["gameId"]}`);
+        })
+    }
+
+    switch (game.status) {
+        case "NEW":
+            startGame();
+            break;
+    }
+
+
+
+    startGame();
+}
 
 async function createPlayer(nick) {
     return fetch(`${BACKEND}/players`, {
@@ -131,148 +395,3 @@ async function createPlayer(nick) {
         });
 }
 
-function connectWebSocket(playerId) {
-    socket = new WebSocket(
-        `${BACKEND_WS}/${playerId}`
-    )
-    socket.onmessage = (event) => {
-        applyDelta(JSON.parse(event.data))
-    }
-}
-
-function disconnectWebSocket() {
-    socket.close();
-    console.log("Disconnected player WEBSOCKET session");
-}
-
-function drawGame(game) {
-    setCanvasSize();
-    let canvas = document.getElementById("board")
-    let boardSize = game.boardSize;
-    let width = canvas.offsetWidth;
-    let fieldSize = width / boardSize;
-
-    let context = canvas.getContext("2d");
-    context.fillStyle = BACKGROUND_FILL_STYLE;
-    context.fillRect(0, 0, width, width);
-
-    for (let snake of game.snakes) {
-        context.fillStyle = getSnakeColor(snake);
-        for (let part of snake.parts) {
-            context.fillRect(part.x * fieldSize, part.y * fieldSize, fieldSize, fieldSize)
-        }
-    }
-
-    for (let apple of game.apples) {
-        context.fillStyle = APPLE_FILL_STYLE;
-        context.fillRect(apple.coordinates.x * fieldSize, apple.coordinates.y * fieldSize, fieldSize, fieldSize)
-    }
-}
-
-function keyToDirection(key) {
-    switch (key) {
-        case "ArrowUp":
-            return "UP";
-        case "ArrowDown":
-            return "DOWN";
-        case "ArrowLeft":
-            return "LEFT";
-        case "ArrowRight":
-            return "RIGHT";
-        default:
-            return "NONE"
-    }
-}
-
-document.addEventListener(
-    "keydown",
-    (event) => {
-        if (socket == null) {
-            return;
-        }
-        let direction = keyToDirection(event.key);
-        if (direction !== "NONE") {
-            socket.send(JSON.stringify({
-                "direction": direction
-            }))
-        }
-    }
-)
-
-
-function getSnakeColor(snake) {
-    let color = snake.color;
-    return `rgb(${color.r},${color.g},${color.b})`;
-}
-
-function showError(message) {
-    let myToast = document.getElementById("errorToast");
-    myToast.querySelector('.toast-body').innerHTML = message;
-    let toast = new bootstrap.Toast(myToast, {})
-    toast.show()
-}
-
-function applyDelta(delta) {
-    let canvas = document.getElementById("board")
-    let width = canvas.offsetWidth;
-    let fieldSize = width / game.boardSize;
-
-    let context = canvas.getContext("2d");
-
-    for (let newSnake of delta.addSnakes) {
-        let player = new Player(newSnake.player.id, newSnake.player.name, 0, "CONNECTED");
-        players.set(player.id, player);
-        snakes.set(newSnake.id, newSnake)
-    }
-
-    for (let removedSnake of delta.removeSnakes) {
-        console.log("removing: " + removedSnake + "\n currentPlayerId: " + currentPlayerId);
-        if (removedSnake.player.id === currentPlayerId) {
-            alert("You lost");
-        }
-
-        let player = players.get(removedSnake.player.id);
-        player.status = "DEAD";
-        snakes.delete(removedSnake.id)
-    }
-
-    context.fillStyle = BACKGROUND_FILL_STYLE;
-
-    let pointBalance = new Map();
-
-    for (let removePart of delta.removeParts) {
-
-        if (removePart.type === "SNAKE") {
-            pointBalance.set(removePart.id, pointBalance.has(removePart.id) ? pointBalance.get(removePart.id) - 1 : -1);
-        }
-
-        context.fillRect(removePart.coordinates.x * fieldSize, removePart.coordinates.y * fieldSize, fieldSize, fieldSize)
-    }
-
-    for (let addPart of delta.addParts) {
-        if (addPart.type === "SNAKE") {
-            pointBalance.set(addPart.id, pointBalance.has(addPart.id) ? pointBalance.get(addPart.id) + 1 : 1);
-        }
-        context.fillStyle = addPart.type === "SNAKE" ? getSnakeColor(snakes.get(addPart.id)) : APPLE_FILL_STYLE;
-        context.fillRect(addPart.coordinates.x * fieldSize, addPart.coordinates.y * fieldSize, fieldSize, fieldSize)
-    }
-
-    pointBalance.forEach((v, k) => {
-        if (v !== 0) {
-            let playerId = snakes.get(k).player.id;
-            players.get(playerId).score += v;
-        }
-    })
-
-    // console.log(players)
-}
-
-function startGame() {
-    fetch(`${BACKEND}/games/${game["gameId"]}`,
-        {
-            method: 'POST'
-        }
-    ).then(response => {
-        // console.log(response)
-    })
-}
