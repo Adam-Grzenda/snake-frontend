@@ -12,14 +12,18 @@
 
 <div class="container-fluid">
     <div class="row" style="height: 95vh">
-        <div class="col-sm-3 border" id="sidebar" >
-            <div class="p-4 border-bottom">
+        <div class="col-sm-3 border" id="sidebar">
+            <div class="p-4 border-bottom collapse" id="game-management">
+                <button type="submit" class="form-control btn-danger" onclick="endGame()">
+                    Exit game
+                </button>
+
                 <label for="game-id-display" class="col-form-label">Game ID</label>
                 <button type="submit" class="form-control" id="game-id-display"
                         onclick="onClickGameId()" data-toggle="tooltip" title="Click to copy to clipboard">
                     some-game-id
                 </button>
-                <button type="submit" class="form-control" onclick="changeGameState()">
+                <button id="gameStateButton" type="submit" class="form-control" onclick="changeGameState()">
                     Start game
                 </button>
             </div>
@@ -35,11 +39,9 @@
                         <th scope="col">Score</th>
                     </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="ranking-table-body">
                     <tr>
-                        <td>Test</td>
-                        <td bgcolor="aqua"></td>
-                        <td>1</td>
+                        <td colspan="3">No scores recorded</td>
                     </tr>
                     </tbody>
                 </table>
@@ -64,7 +66,7 @@
                             <input type="text" class="form-control" id="game-id">
                         </div>
                         <div class="col-sm-3">
-                            <button type="submit" class="btn btn-success" disabled id="join-game-btn"
+                            <button type="submit" class="btn btn-success" id="join-game-btn"
                                     onclick="joinGameSession()">Join
                             </button>
                         </div>
@@ -73,7 +75,7 @@
                         OR
                     </div>
                     <div class="form-group row pt-3 d-flex justify-content-center align-items-center">
-                        <button type="submit" class="btn btn-primary" disabled id="create-game-btn"
+                        <button type="submit" class="btn btn-primary" id="create-game-btn"
                                 onclick="createGame()">
                             Create a new game
                         </button>
@@ -83,13 +85,9 @@
             <div class="card text-center collapse canvas-container" id="game-board">
                 <canvas id="board" style="background-color: cornflowerblue;"></canvas>
             </div>
-            <div id="errorToast" class="toast fixed-bottom" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="toast-header">
-                    <strong class="mr-auto">Something went wrong</strong>
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="toast">Close</button>
-                </div>
+            <div id="toast" class="toast fixed-bottom" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="toast-body">
-                    Treść wiadomości.
+                    Toast message placeholder
                 </div>
             </div>
         </div>
@@ -117,8 +115,17 @@
             aria-controls="game-board">
         Button with data-target
     </a>
+    <a
+            hidden
+            id="collapseManagementButton"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#game-management"
+            aria-expanded="false"
+            aria-controls="game-management">
+        Button with data-target
+    </a>
 </p>
-
 
 
 <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"

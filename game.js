@@ -9,10 +9,10 @@ let snakes = new Map();
 function Player(id, name, score, status) {
     this.id = id;
     this.name = name;
-    this.score = score;
     this.status = status;
     return this;
 }
+
 
 function Snake(id, playerNick, r, g, b, length) {
     this.id = id;
@@ -24,33 +24,92 @@ function Snake(id, playerNick, r, g, b, length) {
 }
 
 
-let nickInput = document.getElementById("nick");
+let playerNickInput = document.getElementById("nick");
 let gameIdInput = document.getElementById("game-id");
 let joinGameBtn = document.getElementById("join-game-btn");
 let createGameBtn = document.getElementById("create-game-btn");
 
 let collapseFormButton = document.getElementById("collapseFormButton");
 let collapseBoardButton = document.getElementById("collapseGameButton");
+let collapseManagementButton = document.getElementById("collapseManagementButton");
 
 let sidebarGameId = document.getElementById("game-id-display");
+let gameStateButton = document.getElementById("gameStateButton");
 
 
 let player = null;
 let game = null;
 let socket = null;
 
-function onClickGameId() {
-    navigator.clipboard.writeText(document.getElementById("game-id-display").textContent.trim()).then()
+function setGame(newGame) {
+    game = newGame;
+    gameIdInput.value = newGame.gameId
+    sidebarGameId.textContent = game["gameId"]
+    localStorage.setItem("gameId", newGame.gameId);
 }
 
-nickInput.addEventListener("input", function () {
-    let nickValid = nickInput.value.length > 0;
-    createGameBtn.disabled = !nickValid
-})
+function setPlayer(newPlayer) {
+    player = newPlayer;
+    playerNickInput.value = newPlayer.name;
+    localStorage.setItem("player", JSON.stringify(newPlayer));
+}
 
-gameIdInput.addEventListener("input", function () {
-    joinGameBtn.disabled = nickInput.value.length === 0 || gameIdInput.value.length === 0;
-})
+function showGame(currentGame) {
+    collapseFormButton.click();
+    document.getElementById("game-board").addEventListener('shown.bs.collapse', function () {
+        drawGame(currentGame);
+        writeRanking(snakes.values())
+    })
+    collapseBoardButton.click();
+    collapseManagementButton.click();
+}
+
+function showForm() {
+    collapseBoardButton.click();
+    collapseManagementButton.click();
+    collapseFormButton.click();
+}
+
+function showToast(message) {
+    let myToast = document.getElementById("toast");
+    myToast.querySelector('.toast-body').innerHTML = message;
+    let toast = new bootstrap.Toast(myToast, {})
+    toast.show()
+}
+
+window.onload = (_) => {
+    let previousGameId = localStorage.getItem("gameId");
+    let previousPlayer = localStorage.getItem("player");
+
+    if (previousGameId && previousPlayer) {
+        setPlayer(JSON.parse(previousPlayer));
+        fetch(`${BACKEND}/games/${previousGameId}`,
+            {
+                method: 'GET'
+            })
+            .then(response => {
+                return response.json()
+            })
+            .then(previousGame => {
+                if (previousGame.status === 'RUNNING' || previousGame.status === 'PAUSED' || previousGame.status === "NEW") {
+                    setGame(previousGame);
+                    joinGameSession().then(_ =>
+                        console.log("Rejoined previous game")
+                    )
+                } else {
+                    showToast("Previous game is already finished");
+                }
+            });
+    } else {
+        console.log("No previous game or player found");
+    }
+
+}
+
+function onClickGameId() {
+    navigator.clipboard.writeText(document.getElementById("game-id-display").textContent.trim()).then()
+    showToast("Game ID copied to clipboard!");
+}
 
 function setCanvasSize() {
     let container = document.getElementById("game-board");
@@ -60,7 +119,35 @@ function setCanvasSize() {
     canvas.height = 800;
 }
 
+function writeRanking(snakesIt) {
+    let body = document.getElementById("ranking-table-body");
+    let rows = "";
+    let snakes = Array.from(snakesIt);
+    snakes.sort((a, b) => b.length - a.length);
+
+    for (let snake of snakes) {
+        rows += "<tr>" +
+            `<td>${snake.playerName}</td>` +
+            `<td style="background-color:rgb(${snake.r}, ${snake.g}, ${snake.b});"></td>` +
+            `<td>${snake.length}</td>` +
+            "</tr>"
+    }
+
+    if (rows === "") {
+        body.innerHTML =
+            "<tr><td colspan=\"3\">No scores recorded</td></tr>"
+    } else {
+        body.innerHTML = rows;
+    }
+}
+
+
 async function createGame() {
+    if (!playerNickInput.value) {
+        showToast("Please enter your nick");
+        return;
+    }
+
     await fetch(`${BACKEND}/games`, {
         method: 'POST',
         headers: {
@@ -69,34 +156,31 @@ async function createGame() {
         body: JSON.stringify({"boardSize": 20})
     })
         .then(response => response.json())
-        .then(response => {
-            game = response;
+        .then(game => {
+            setGame(game)
             console.log(`Created game: ${game["gameId"]}`);
-            gameIdInput.value = game["gameId"];
         })
     await joinGameSession();
 }
 
 async function joinGameSession() {
-    if (player == null || player["name"] !== nickInput.value) {
-        player = await createPlayer(nickInput.value);
-    }
-
-    game = {"gameId": gameIdInput.value};
-    sidebarGameId.textContent = game["gameId"]
-
-    if (!game["gameId"]) {
+    if (!(playerNickInput.value && gameIdInput.value)) {
+        showToast("Please enter your nick and game ID");
         return;
     }
 
+    if (player == null || player.name !== playerNickInput.value) {
+        player = await createPlayer(playerNickInput.value);
+    }
+    setGame({"gameId": gameIdInput.value});
     connectWebSocket(player["id"]);
     console.log(`Created player: ${player["id"]} joining game with id ${game["gameId"]}`);
 
     socket.onopen = (
-        (event) => {
+        (_) => {
             console.log("Successfully connected to player session")
-            joinGame().catch(e => {
-                showError("Invalid game ID")
+            joinGame().catch(_ => {
+                showToast("Invalid game ID")
                 disconnectWebSocket()
             })
         }
@@ -115,13 +199,9 @@ async function joinGame() {
             return response.json()
         })
 
-    game = currentGame;
-    collapseFormButton.click();
-    document.getElementById("game-board").addEventListener('shown.bs.collapse', function () {
-        drawGame(currentGame);
-    })
-    collapseBoardButton.click();
-
+    setGame(currentGame);
+    setGameButtonContent()
+    showGame(currentGame);
 }
 
 
@@ -166,7 +246,7 @@ function drawGame(game) {
     }
 
     for (let apple of game.apples) {
-        drawPart(apple.coordinates.x, apple.coordinates.y, APPLE_FILL_STYLE)
+        drawPart(apple.x, apple.y, APPLE_FILL_STYLE)
     }
 }
 
@@ -200,12 +280,6 @@ document.addEventListener(
     }
 )
 
-function showError(message) {
-    let myToast = document.getElementById("errorToast");
-    myToast.querySelector('.toast-body').innerHTML = message;
-    let toast = new bootstrap.Toast(myToast, {})
-    toast.show()
-}
 
 function drawPart(x, y, color) {
     let canvas = document.getElementById("board")
@@ -234,6 +308,7 @@ function addPlayer(data) {
     console.log(`New player joined: ${nick}, snakeId: ${snakeId}, color: (${r}, ${g}, ${b}), head: (${x}, ${y})`);
     snakes.set(snakeId, new Snake(snakeId, nick, r, g, b, 1));
     drawPart(x, y, `rgb(${r},${g},${b})`)
+    writeRanking(snakes.values())
 }
 
 function applyBinaryDelta(data) {
@@ -287,13 +362,13 @@ function applyBinaryDelta(data) {
     }
 
     for (let balance of pointBalance.entries()) {
-        if (balance.value >= 2) {
-            let snake = snakes.get(balance.key);
+        if (balance[1] >= 1) {
+            let snake = snakes.get(balance[0]);
             if (!snake) {
                 console.error("Unknown snake with point balance");
                 continue;
             }
-            snake.length += balance.value - 1;
+            snake.length += balance[1];
         }
     }
 
@@ -301,23 +376,20 @@ function applyBinaryDelta(data) {
         for (let snakeId of deadSnakeIds) {
             let snake = snakes.get(snakeId);
             if (snake.playerName === player.name) {
-                console.log("You lose");    //todo
+                showToast("You lost!")
             } else {
-                console.log(`Player: ${snake.playerName} lost`);
+                showToast("Player: ${snake.playerName} lost!")
             }
         }
     }
-
+    writeRanking(snakes.values())
 }
+
 
 function endGame() {
+    localStorage.removeItem("gameId");
     console.log("Game ended");
-    collapseBoardButton.click();
-    collapseFormButton.click();
-}
-
-function pauseGame(data) {
-    console.log(`Game paused by snake id: ${data.getUint8(1)}`)
+    showForm();
 }
 
 function parseEvent(bytearray) {
@@ -325,6 +397,10 @@ function parseEvent(bytearray) {
     let messageType = data.getUint8(0);
 
     console.log(`Message received with type: ${messageType}`);
+    if (messageType === 1 && (game.status === "PAUSED" || game.status === "NEW")) {
+        gameRunning()
+    }
+
 
     switch (messageType) {
         case 0:
@@ -334,7 +410,7 @@ function parseEvent(bytearray) {
             applyBinaryDelta(data);
             break;
         case 2:
-            pauseGame(data);
+            gamePaused()
             break;
         case 3:
             endGame()
@@ -357,27 +433,85 @@ function connectWebSocket(playerId) {
     }
 }
 
+function gamePaused() {
+    game.status = "PAUSED";
+    setGameButtonContent()
+}
+
+function gameRunning() {
+    game.status = "RUNNING";
+    setGameButtonContent()
+}
+
+function setGameButtonContent() {
+    switch (game.status) {
+        case "RUNNING":
+            gameStateButton.textContent = "Pause game";
+            break;
+        case "NEW":
+            gameStateButton.textContent = "Start game";
+            break;
+        case "PAUSED":
+            gameStateButton.textContent = 'Resume game'
+            break;
+    }
+}
 
 function changeGameState() {
     function startGame() {
-        fetch(`${BACKEND}/games/${game["gameId"]}`,
+        fetch(`${BACKEND}/games/${game.gameId}/start`,
             {
                 method: 'POST'
             }
-        ).then(response => {
-            console.log(`Started game with ID: ${game["gameId"]}`);
+        ).then(_ => {
+            console.log(`Started game with ID: ${game.gameId}`);
         })
     }
 
-    switch (game.status) {
-        case "NEW":
-            startGame();
-            break;
+    function pauseGame() {
+        fetch(`${BACKEND}/games/${game.gameId}/pause`,
+            {
+                method: 'POST',
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(player),
+            }
+        ).then(_ => {
+            console.log(`Paused game with ID: ${game.gameId}`);
+        })
+    }
+
+    function resumeGame() {
+        fetch(`${BACKEND}/games/${game.gameId}/resume`,
+            {
+                method: 'POST'
+            }
+        ).then(_ => {
+            console.log(`Resumed game with ID: ${game.gameId}`);
+        })
     }
 
 
+    console.log(`Clicked on state: ${game.status}`)
 
-    startGame();
+
+    switch (game.status) {
+        case "RUNNING":
+            pauseGame()
+            game.status = "PAUSED";
+            break;
+        case "NEW":
+            startGame();
+            gamePaused();
+            break;
+        case "PAUSED":
+            resumeGame();
+            gameRunning();
+            break;
+    }
+    setGameButtonContent();
+
 }
 
 async function createPlayer(nick) {
@@ -391,6 +525,7 @@ async function createPlayer(nick) {
         response => response.json()
     )
         .then(player => {
+            localStorage.setItem("player", JSON.stringify(player));
             return player;
         });
 }
