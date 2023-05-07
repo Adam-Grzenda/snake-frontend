@@ -378,7 +378,7 @@ function applyBinaryDelta(data) {
             if (snake.playerName === player.name) {
                 showToast("You lost!")
             } else {
-                showToast("Player: ${snake.playerName} lost!")
+                showToast(`Player: ${snake.playerName} lost!`)
             }
         }
     }
@@ -458,8 +458,8 @@ function setGameButtonContent() {
 }
 
 function changeGameState() {
-    function startGame() {
-        fetch(`${BACKEND}/games/${game.gameId}/start`,
+    function startGame(millis) {
+        fetch(`${BACKEND}/games/${game.gameId}/start?stepMillis=${millis}`,
             {
                 method: 'POST'
             }
@@ -482,14 +482,18 @@ function changeGameState() {
         })
     }
 
-    function resumeGame() {
-        fetch(`${BACKEND}/games/${game.gameId}/resume`,
+    function resumeGame(millis) {
+        fetch(`${BACKEND}/games/${game.gameId}/resume?stepMillis=${millis}`,
             {
                 method: 'POST'
             }
         ).then(_ => {
             console.log(`Resumed game with ID: ${game.gameId}`);
         })
+    }
+
+    function getSetMillis() {
+        return Number(document.getElementById("game-speed").value) * 1000;
     }
 
 
@@ -502,11 +506,11 @@ function changeGameState() {
             game.status = "PAUSED";
             break;
         case "NEW":
-            startGame();
+            startGame(getSetMillis());
             gamePaused();
             break;
         case "PAUSED":
-            resumeGame();
+            resumeGame(getSetMillis());
             gameRunning();
             break;
     }

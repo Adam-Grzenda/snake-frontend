@@ -13,19 +13,26 @@
 <div class="container-fluid">
     <div class="row" style="height: 95vh">
         <div class="col-sm-3 border" id="sidebar">
-            <div class="p-4 border-bottom collapse" id="game-management">
+            <div class="p-4 border-bottom collapse text-center" id="game-management">
                 <button type="submit" class="form-control btn-danger" onclick="endGame()">
                     Exit game
                 </button>
 
+                <button id="gameStateButton" type="submit" class="form-control mt-2 btn-primary" onclick="changeGameState()">
+                    Start game
+                </button>
                 <label for="game-id-display" class="col-form-label">Game ID</label>
                 <button type="submit" class="form-control" id="game-id-display"
                         onclick="onClickGameId()" data-toggle="tooltip" title="Click to copy to clipboard">
                     some-game-id
                 </button>
-                <button id="gameStateButton" type="submit" class="form-control" onclick="changeGameState()">
-                    Start game
-                </button>
+                <label for="game-speed" class="col-form-label">Game step time</label>
+                <select id="game-speed" class="form-control form-control-sm">
+                    <option>0.1</option>
+                    <option>0.25</option>
+                    <option>0.5</option>
+                    <option>1</option>
+                </select>
             </div>
             <div class="p-4">
                 <table class="table table-bordered">
